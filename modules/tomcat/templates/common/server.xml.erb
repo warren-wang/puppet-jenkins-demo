@@ -1,0 +1,87 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+# ******************
+# Managed by Puppet
+# ******************
+-->
+<Server port="<%= @control_port %>" shutdown="SHUTDOWN">
+<% if scope.function_versioncmp([scope['::tomcat::version'], '8.0.14']) >= 0 -%>
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+<% end -%>
+<% if scope.function_versioncmp([scope['::tomcat::maj_version'], '7']) >= 0 -%>
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+<% end -%>
+<% if scope['::tomcat::maj_version'] == '7' -%>
+  <Listener className="org.apache.catalina.core.JasperListener" />
+<% end -%>
+<% if scope['::tomcat::maj_version'] == '6' -%>
+  <Listener className="org.apache.catalina.mbeans.ServerLifecycleListener" />
+<% end -%>
+<% if @jmx_listener -%>
+  <Listener className="org.apache.catalina.mbeans.JmxRemoteLifecycleListener" rmiRegistryPortPlatform="<%= @jmx_registry_port %>" rmiServerPortPlatform="<%= @jmx_server_port %>"<% if @jmx_bind_address and @jmx_bind_address != '' -%> rmiBindAddress="<%= @jmx_bind_address %>"<% end -%> />
+<% end -%>
+<% if @apr_listener -%>
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" <% if @apr_sslengine and @apr_sslengine != '' -%>SSLEngine="<%= @apr_sslengine %>" <% end -%>/>
+<% end -%>
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+
+  <GlobalNamingResources>
+    <Resource name="UserDatabase" auth="Container"
+              type="org.apache.catalina.UserDatabase"
+              description="User database that can be updated and saved"
+              factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
+              pathname="conf/tomcat-users.xml" />
+  </GlobalNamingResources>
+
+  <Service name="Catalina">
+
+<% if @threadpool_executor -%>
+    <Executor name="tomcatThreadPool" namePrefix="catalina-exec-"
+        maxThreads="150" minSpareThreads="4" />
+
+<% end -%>
+<% if @http_connector -%>
+    <Connector port="<%= @http_port %>" protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="<%= @ssl_port %>" <% if @use_threadpool and @threadpool_executor -%>executor="tomcatThreadPool" <% end -%>/>
+
+<% end -%>
+<% if @ssl_connector -%>
+<% if scope['::tomcat::maj_version'] == '8' -%>
+    <Connector port="<%= @ssl_port %>" protocol="org.apache.coyote.http11.Http11NioProtocol"
+<% else -%>
+    <Connector port="<%= @ssl_port %>" protocol="org.apache.coyote.http11.Http11Protocol"
+<% end -%>
+               maxThreads="150" SSLEnabled="true" scheme="https" secure="true"
+               clientAuth="false" sslProtocol="TLS" />
+
+<% end -%>
+<% if @ajp_connector -%>
+    <Connector port="<%= @ajp_port %>" protocol="AJP/1.3" redirectPort="<%= @ssl_port %>" />
+
+<% end -%>
+    <Engine name="Catalina" defaultHost="<%= @hostname %>"<% if @jvmroute and @jvmroute != '' -%> jvmRoute="<%= @jvmroute %>"<% end -%>>
+
+      <Realm className="org.apache.catalina.realm.LockOutRealm">
+        <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+               resourceName="UserDatabase"/>
+      </Realm>
+
+      <Host name="<%= @hostname %>" appBase="webapps"
+            autoDeploy="<%= @autodeploy %>" deployOnStartup="<%= @deployOnStartup %>"
+            unpackWARs="<%= @unpackwars %>" <% if scope['::tomcat::maj_version'] >= '7' -%>undeployOldVersions="<%= @undeployoldversions %>" <% end -%>>
+
+<% if @singlesignon_valve -%>
+        <Valve className="org.apache.catalina.authenticator.SingleSignOn" />
+<% end -%>
+<% if @accesslog_valve -%>
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+               prefix="localhost_access_log<% if scope.function_versioncmp([scope['::tomcat::maj_version'], '7']) <= 0 -%>.<% end -%>" suffix=".txt"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+
+<% end -%>
+      </Host>
+    </Engine>
+  </Service>
+</Server>
